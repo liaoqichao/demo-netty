@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+</head>
+<body>
+	<form action="" onsubmit="return false">
+		<h1>WebSocket网络聊天室</h1>	
+		<textarea id="msgText" rows="15" cols="100"></textarea><hr/>
+		<input type="text" id="msg" name="msg" width="300px"/>
+		<input type="button" value="发送" onclick="send();"/>
+		<input type="button" value="清空" onclick="_clear();"/>
+	</form>
+</body>
+<script type="text/javascript">
+	var socket;
+	if(!window.WebSocket){
+		window.WebSocket = window.MozWebSocket;	// IE，IE的window.MozWebSocket也为undefined
+	}
+	if(typeof(window.WebSocket) != "undefined"){
+		// ws:// websocket协议前缀,后台根据uri匹配，chat后面不要加"/"，否则equals不成立
+		socket = new WebSocket("ws://localhost:12345/chat"); 
+		
+		// websocket接收到数据时触发事件
+		socket.onmessage = function(event){
+			var textArea = document.getElementById("msgText");
+			textArea.value = textArea.value + "\n" +event.data;
+		};
+		
+		// 连接上服务器端触发
+		socket.onopen = function(){
+			var textArea = document.getElementById("msgText");
+			textArea.value = "连接上服务器";
+		};
+		
+		socket.opclose = function(event){
+			var textArea = document.getElementById("msgText");
+			textArea.value = textArea.value + "\n" + "退出聊天室";
+		};
+	}
+
+	function send(){
+		// 判断websocket对象是否为空
+		if(!window.WebSocket){
+			return false;
+		}
+		// 判断websocket状态
+		if(socket.readyState == WebSocket.OPEN){
+			var msg = document.getElementById("msg");
+			socket.send(msg.value);
+			msg.value = "";
+		} else{
+			alert("没有建立连接");
+		}
+	}
+	
+	function _clear(msg){
+		var msg = document.getElementById('msg');
+		msg.value = "";
+	}
+</script>
+</html>

@@ -1,0 +1,5 @@
+option java_outer_classname = "PkgEntity";
+message Pkg{
+	required int32 reqType = 1;
+	optional string data = 2;
+}

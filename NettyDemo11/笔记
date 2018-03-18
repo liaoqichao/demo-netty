@@ -1,0 +1,37 @@
+1. 创建maven项目
+2. pom.xml添加netty依赖，如果没下载到jar包关了IDE再开。
+如果还是不能使用jar包，在仓库删掉jia包重新下载。
+	  <dependency>
+	    <groupId>io.netty</groupId>
+	    <artifactId>netty-all</artifactId> <!-- Use 'netty-all' for 4.0 or above -->
+	    <version>4.1.20.Final</version>
+	    <scope>compile</scope>
+	  </dependency>
+3. 创建页面index.html
+4. WebSocketServer
+	- pipeline
+		* HttpServerCodec：将请求和响应编码或解码成http协议消息
+		* HttpObjectAggregator(len)：把多个HTTP请求中的数据组装成一个,len:接收数据最大长度
+		* ChunkedWriteHandler：这个handler主要用于处理大数据流
+		* 自定义处理器，用于解析http请求
+		* WebSocketServerProtocolHandler("/chat"):websocket的处理器，path表示请求uri包含path则认为是websocket协议
+		* TextWebSocketFrameHandler(),自定义handler，处理websocket请求
+	- 接收Http请求
+		* 获取FullHttpRequest请求，根据uri是否包含指定路径来判断是http请求还是websocket请求，
+			如果是包含路径则判断为是websocket，传递到下个处理器。否则则创建httpResponse写页面。
+			> httpResponse写页面
+				1. 创建HttpResponse（不能是Full...）
+				2. 设置响应头：设置contentType，为text/html才会被浏览器解析
+				3. 设置响应头：判断keepAlive，如果保持连接则设置CONTENT_LENGTH=文件大小，
+					CONNECTION=HttpHeaderValues.KEEP_ALIVE
+				4. 写http响应ctx.write(response); 
+				5. 写文件内容，ctx.write(new ChunkedNioFile(file.getChannel())); 
+				6. 写标记通过chunked编码的写操作结束结束。ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+	- 接收WebSocket请求
+		* 写到Websocket纯文本帧
+			> ctx.writeAndFlush(new TextWebSocketFrame(string));
+5. 客户端
+	* js
+		> 1. 判断浏览器是否支持websocket
+		> 2. var ws = new WebSocket("ws://localhost:12345/chat"); //建立连接
+		> 3. ws的onmessage,onsend,onerror,onclose事件

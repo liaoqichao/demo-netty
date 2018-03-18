@@ -1,0 +1,226 @@
+教程：
+https://waylau.com/essential-netty-in-action/GETTING%20STARTED/Asynchronous%20and%20Event%20Driven.html
+
+单工通信：在同一时间只有一方能接受或发送信息，不能实现双向通信，举例：电视，广播 
+半双工通信：在同一时间只可以有一方接受或发送信息，可以实现双向通信。举例：对讲机 ，HTTP
+全双工通信：在同一时间可以同时接受和发送信息，实现双向通信，举例：电话通信，WebSocket
+
+一、使用netty进行NIO通信步骤：
+在学习Netty前使用NIO通信的步骤：
+1. 创建ServerSocketChannel，并设置为非阻塞性
+2. 绑定监听，配置TCP参数，录入backlog大小等
+3. 创建独立的IO线程，用于轮询复用器Selector
+4. 创建Selector，将ServerSocketChannel注册到Selector上，并设置监听	标识位SelectionKey.ACCEPT
+5. 启动IO线程，在循环体中执行Selector.select()，轮询就绪的通道
+6. 当轮询到处于就绪的通道时，需要进行判断操作位，如果是ACCEPT状态，说明是新的客户端接入，则调用accept方法接收新的客户端
+7. 设置新接入客户端的一些参数，如非阻塞、并将其通道继续注册到Selector中，监听标识位等
+8. 如果轮询到的通道操作位是READ，则进行读取，构造Buffer对象等
+9. 更细节的还有数据没发送完成继续发送等问题
+
+netty实现通信的步骤：
+1. 创建2个单独的NIO线程，一个专门用户网络事件处理（接收客户端连接），另一个则进行网络通信读写
+2. 创建一个ServerBootstrap对象，配置netty的参数，例如接收/输出数据的缓存大小
+3. 创建一个实际处理数据的的类ChannelInitializer，进行初始化的准备工作，比如设置输出数据的字符集、格式、以及实际处理的数据的接口
+4. 绑定端口，执行同步阻塞方法等待服务器端启动
+
+二、netty核心
+1. 可扩展的事件模型
+2. 统一的通信API
+3. 零拷贝的Buffer（内存零拷贝）
+
+三、ChennelHandler
+3.1 处理和拦截入站的ChennelHandler
+	- ChannelInboundHandler
+3.2 处理和拦截出站的ChennelHandler
+	- ChannelOutboundHandler
+3.3 同时处理和拦截入站和出站的ChennelHandler ChannelDuplexHandler
+
+三、编码注意：
+1. SimpleChannelInboundHandler和ChannelInboundHandlerAdapter区别 
+	在客户端的业务Handler继承的是SimpleChannelInboundHandler，而在服务器端继承的是ChannelInboundHandlerAdapter。
+	最主要的区别就是SimpleChannelInboundHandler在接收到数据后会自动release
+	掉数据占用的Bytebuffer资源(自动调用Bytebuffer.release())。而为何服务器端不能用呢，
+	因为我们想让服务器把客户端请求的数据发送回去，而服务器端有可能在channelRead方法返回前还没有写完数据，
+	因此不能让它自动release。
+2. pipeline添加handler顺序：
+	2.1 无论服务器还是客户端都是：inbound（解码）顺序、outbound（编码）逆序、inbound（业务）最后
+
+四、编码器、解码器
+	消息被编码后解码后会自动通过ReferenceCountUtil.release(message)释放，
+	如果不想释放消息可以使用ReferenceCountUtil.retain(message)，这将会使引用数量增加而没有消息发布，
+	大多数时候不需要这么做。
+1. Codec编解码器
+	1. 带编码解码
+2. Decoder解码器
+	2.1 解码器负责把接收的字节数组解码成消息或者解码成其他序列化字节，解码器处理接收过来的数据是抽象的
+		ChannelInboundHandler的实现，将接收到的数据传递到ChannelPipeline中的ChannelInboundHandler进行处理。
+	2.2 ByteToMessageDecoder
+		2.2.1 将字节数组转化为pojo
+		2.2.2 主要方法：
+			decode(ChannelHandlerContext, ByteBuf, List<Object>)//这个方法是唯一的一个需要自己实现的抽象方法，作用是将ByteBuf数据解码成其他形式的数据。
+			decodeLast(ChannelHandlerContext, ByteBuf, List<Object>)//实际上调用的是decode(...)。
+	2.3 MessageToMessageDecoder
+		2.3.1 使用方法：继承MessageToMessageDecoder<T> T是解码前的泛型
+		2.3.2 主要方法：
+			decode(ChannelHandlerContext ctx, T msg, List<Object> out)
+3. Encoder编码器
+	3.1 使用：
+		继承MessageToByteEncoder或MessageToMessageEncoder，都带泛型T，编码前的类型
+	3.2 主要方法：
+		encode(ChannelHandlerContext ctx, T msg, List<Object> out)
+4. 编码框架
+	4.1 Marshalling（只能JBoss用）
+	4.2 protobuf
+		4.2.1 介绍
+			Protobuf全称Google Protocol Buffers，它由谷歌开源而来，在谷歌内部久经考验。
+			它将数据结构以.proto文件进行描述，通过代码生成工具可以生成对应数据结构的POJO对象和Protobuf相关的方法和属性。
+		4.2.2 特点
+			4.2.2.1 结构化数据存储（XML、JSON等）
+			4.2.2.2 高效的编码解码性能
+			4.2.2.3 语言无关、平台无关、扩展性好
+			4.2.2.4 支持C++、Java、Python
+		4.2.3 优缺点
+			4.2.3.1 优点：简单、快
+			4.2.3.2 确定：无法表示复杂的概念
+		4.2.4 下载安装
+			需要两个包，protobuf-2.5.0.tar.gz，protoc-2.5.0-win32.zip。
+			本来可以到https://code.google.com/p/protobuf/downloads/list下载，不过被墙了。
+			可以移步到这里下载：http://download.csdn.net/detail/erli11/7408633 
+			下载相同版本供java使用的protobuf-java-2.5.0.jar：
+			http://repo1.maven.org/maven2/com/google/protobuf/protobuf-java/2.5.0/protobuf-java-2.5.0.jar
+		4.2.5 配置环境变量
+			配置protoc.exe到PATH环境变量,可以不配
+		4.2.5 编写.proto文件
+			java_package值得是该文件生成的java文件的包路径
+			java_outer_classname值的是生成的class的名称
+			message和enum是它的基本类型，很类似于java的class和枚举
+			required表名这个字段是必须的，option表明这个字段可选，default表明这个字段有默认值
+			repeat表明这个字段可以重复，类似于java中的List，该例子中Car的声明中，就相当于java中的List<Car>
+			每个声明的后面的数字，例如1，2，3, 4等等，同级的声明不能重复
+
+			package netty;
+			option java_package = "com.lyncc.netty.codec.protobuf.demo";
+			option java_outer_classname = "RichManProto";
+			
+			message RichMan {
+			   required int32 id = 1;
+			   required string name = 2;
+			   optional string email = 3;
+			   enum CarType {
+			     AUDI = 0;
+			     BENZ = 1;
+			     LAMBORGHINI = 2;
+			     DASAUTO = 3;
+			   }
+			   message Car {
+			      required string name = 1;
+			      optional CarType type = 2 [default = BENZ];
+			   }
+			   repeated Car cars = 4;
+			}			
+		4.2.6 编译.proto文件
+			cmd执行命令：protoc.exe -I=proto的输入目录 --java_out=java类输出目录 proto的输入目录包括包括proto文件
+		4.2.7 序列化和反序列化
+			4.2.7.1 创建Builder
+				PersonEntity.Person.Builder builder  = PersonEntity.Person.newBuilder();
+			4.2.7.2 设置实体类Person的必填值和选填值
+				builder.setId(1);	builder.setEmail("enjoy_the_game@163.com");
+			4.2.7.3 创建对象
+				Person person = builder.build();
+			4.2.7.4 序列化
+				byte[] bytes = person.toByteArray();
+			4.2.7.5 反序列化
+				Person p = Person.parseFrom(bytes);
+		4.2.8 netty和protobuf整合
+			4.2.8.1 添加解码处理器
+			pipeline.addLast("protobufDecoder", new ProtobufDecoder(MessageEntity.Message.getDefaultInstance()))
+			4.2.8.2 添加解码前处理半包和粘包的处理器
+				（为什么顺序是反的，网上的顺序都是顺着的？pipeline源码中inbound是自底向上执行）
+			pipeline.addLast("frameDecoder", new ProtobufVarint32FrameDecoder())
+			4.2.8.3 添加编码处理器
+			pipeline.addLast("protobufEncoder", new ProtobufEncoder())
+			4.2.8.4 channel直接写读写对象
+	4.3 thrift
+	
+5. 心跳机制和重连机制
+	5.1 心跳机制
+		5.1.1 心跳机制思路
+			5.1.1.1 客户端连接服务器端
+			5.1.1.2 客户端Channel增加IdleStateHandler，设置客户端的读写都空闲（IdleState.ALL_Idle）时间，例如5s。
+			5.1.1.3 客户端所有ChannelHandler中5s内没有write事件，触发userEventTriggered方法，
+				发送一个心跳包给服务器端
+			5.1.1.4 服务器端10s没收到客户端的心跳，则认为客户端挂了，关闭连接。
+				服务器端不回复信息给客户端，以减少客户端的压力。
+			5.1.1.5 客户端断线后重连
+	5.2 重连机制
+		5.2.1 原因：如果服务器挂了，就会断开所有连接，客户端需要重新连接，等服务器起来了就连接成功
+		5.2.2 步骤：见demo7
+		
+五. @Sharable注解
+1. 使用@Sharable注解用来表示一个ChannelHandler可以被安全地共享，即可以在多个Channel的ChannelPipeline中
+	使用同一个ChannelHandler，而不必每一个ChannelPipeline都重新new一个新的ChannelHandler。
+2. 使用@Sharable注解后，ChannelHandler是线程安全的
+3. 使用的例子：
+	3.1 计算整体的吞吐量
+
+六、监听器
+1. channelFuture可以通过addListener()绑定监听器ChannelFutureListener
+2. ChannelFutureListener需要实现operationComplete(ChannelFuture future)方法
+3. operationComplete调用时机为channelFuture操作结束后，例如cf.connect(host,port);调用后执行operationComplete方法
+4. 可以通过operationComplete(ChannelFuture future)中的future对象的isSuccess、isCancellable、cause判断异步执行的状况
+	4.1 isSuccess：异步IO完成时，是否成功
+	4.2 isCancellable：异步操作是否可以取消
+	4.3 cause：返回异步操作异常时抛出的对象
+5. 用处：
+	5.1 判断异步执行状态
+	5.2 性能统计
+
+七、Netty Http
+1. HttpResponseEncoder
+	1.1 属于MessageToMessageEncoder
+2. HttpRequestDecoder
+	1.2 属于ByteToMessageDecoder
+3. HttpObjectAggregator
+	3.1 把多个HttpMessage合起来，变成一个完整的FullHttpRequest或FullHttpResponse
+	3.2 一定要放在HttpResponseEncoder和HttpRequestDecoder后面
+4. HttpContentCompressor
+	4.1 把数据压缩
+5. FullHttpRequest
+	5.1 完整的Http请求
+6. FullHttpResponse
+	6.1 完整的Http响应
+7. 文件传输
+8. SSL
+
+八、Netty整合Spring
+1. 导入netty包和spring包
+2. 把通常链式调用的对象分成成员变量和一个新类，注入成员变量
+
+九、Netty WebSocket
+
+Future模式和Promise模式
+1. Future模式
+	1.1 指的是一类占位符对象，用于指代某些尚未完成的计算的结果。一般来说，由Future指代的计算都是并行执行的，
+		计算完毕后可另行获取相关计算结果。以这种方式组织并行任务，便可以写出高效、异步、非阻塞的并行代码。
+	1.2 所谓Future，是一种用于指代某个尚未就绪的值的对象。而这个值，往往是某个计算过程的结果：
+		- 若该计算过程尚未完成，我们就说该Future未就位；
+		- 若该计算过程正常结束，或中途抛出异常，我们就说该Future已就位。
+	1.3 Future的就位分为两种情况：
+		- 当Future带着某个值就位时，我们就说该Future携带计算结果成功就位。
+		- 当Future因对应计算过程抛出异常而就绪，我们就说这个Future因该异常而失败。
+	1.4 Future的一个重要属性在于它只能被赋值一次。一旦给定了某个值或某个异常，future对象就变成了不可变对象——无法再被改写。
+	1.5 Future最早来源于JDK的java.util.concurrent.Future，它用于代表异步操作的结果。
+		可以通过get方法获取操作结果，如果操作尚未完成，则会同步阻塞当前调用的线程；如果不允许阻塞太长时间或者无限期阻塞，
+		可以通过带超时时间的get方法获取结果；如果到达超时时间操作仍然没有完成，则抛出TimeoutException。通过isDone()
+		方法可以判断当前的异步操作是否完成，如果完成，无论成功与否，都返回true，否则返回false。通过cancel可以尝试取消
+		异步操作，它的结果是未知的，如果操作已经完成，或者发生其他未知的原因拒绝取消，取消操作将会失败。
+		由于Netty的Future都是与异步I/O操作相关的，因此，命名为ChannelFuture，代表它与Channel操作相关。
+	1.6 ChannelFuture有两种状态：uncompleted和completed。当开始一个I/O操作时，一个新的ChannelFuture被创建，
+		此时它处于uncompleted状态——非失败、非成功、非取消，因为I/O操作此时还没有完成。一旦I/O操作完成，
+		ChannelFuture将会被设置成completed，它的结果有如下三种可能。
+		- 操作成功；
+		- 操作失败；
+		- 操作被取消。
+2. Promise
+	2.1 Promise是可以写的Future。
+		- Promise可以通过setSuccess, setFailure(Throwable )来设置是否成功，设置抛出的异常

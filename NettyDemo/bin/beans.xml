@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:util="http://www.springframework.org/schema/util"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-4.0.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/util
+        http://www.springframework.org/schema/util/spring-util-4.0.xsd 
+        http://www.springframework.org/schema/tx/spring-tx-4.0.xsd"
+        >
+        
+        <context:component-scan base-package="netty.demo10.server"></context:component-scan>
+        
+        <bean id="tcpServer" class="netty.demo10.server.NettyTCPServer" destroy-method="stopServer">
+        	<constructor-arg ref="tcpConfig"></constructor-arg>
+        	<constructor-arg ref="myChannelInitializer"></constructor-arg>
+        </bean>
+        
+        <bean id="myChannelInitializer" class="netty.demo10.server.MyChannelInitializer"></bean>
+        
+        <bean id="tcpConfig" class="netty.demo10.server.NettyConfig">
+<!--         	<property name="channelOptions" > -->
+<!--         		<map> -->
+<!--         			<entry  key-ref="channelOption_SO_KEEPALIVE" value="true" value-type="java.lang.Boolean"/> -->
+<!--         			<entry key-ref="channelOption_SO_BACKLOG" value="128" value-type="java.lang.Integer"/> -->
+<!--         		</map> -->
+<!--         	</property> -->
+        	<property name="parentGroup" ref="parentGroup"></property>
+        	<property name="childGroup" ref="childGroup"></property>
+        	<property name="portNumber" value="12345"></property>
+        </bean>
+        
+<!--         <util:map id="tcpChannelOptions" map-class="java.util.HashMap"> -->
+<!--         	<entry> -->
+<!--         		<key><util:constant static-field="io.netty.channel.ChannelOption.SO_KEEPALIVE"></util:constant></key> -->
+<!--         		<value type="java.lang.Boolean">true</value> -->
+<!--         	</entry> -->
+<!--         	<entry> -->
+<!--         		<key><util:constant static-field="io.netty.channel.ChannelOption.SO_BACKLOG"></util:constant></key> -->
+<!--         		<value type="java.lang.Integer">128</value> -->
+<!--         	</entry> -->
+<!--         </util:map> -->
+        
+        <bean id="parentGroup" class="io.netty.channel.nio.NioEventLoopGroup" destroy-method="shutdownGracefully">
+        	<constructor-arg type="int" index="0" value="2"></constructor-arg>
+        	<constructor-arg index="1" ref="parentThreadFactory"></constructor-arg>
+        </bean>
+        
+        <bean id="childGroup" class="io.netty.channel.nio.NioEventLoopGroup" destroy-method="shutdownGracefully">
+        	<constructor-arg type="int" index="0" value="8"></constructor-arg>
+        	<constructor-arg index="1" ref="childThreadFactory"></constructor-arg>
+        </bean>
+        
+        <bean id="parentThreadFactory" class="netty.demo10.server.NamedThreadFactory">
+        	<constructor-arg type="java.lang.String" value="Server-Parent"></constructor-arg>
+        </bean>
+        <bean id="childThreadFactory" class="netty.demo10.server.NamedThreadFactory">
+        	<constructor-arg type="java.lang.String" value="Server-Child"></constructor-arg>
+        </bean>
+</beans>

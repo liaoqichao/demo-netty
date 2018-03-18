@@ -1,0 +1,7 @@
+// option java_package = "netty.demo4.pojo";
+option java_outer_classname = "PersonEntity"; 	// 生成的Java类的类名，这里的key都区分大小写的
+message Person{
+	required int32 id = 1;  					// required表示必须字段，在后面使用中必须给它设置值
+	required string name = 2;
+	optional string email = 3; 					// 可选字段，在后面使用中可以不给它设置值
+}												// 这里不需要分号

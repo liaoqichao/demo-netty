@@ -1,0 +1,8 @@
+option java_outer_classname = "MessageEntity";
+message Message{
+	required string username = 1;
+	required string psw = 2;
+	required string validateCode = 3;
+	optional string snd = 4;
+	optional string rcv = 5;
+}
